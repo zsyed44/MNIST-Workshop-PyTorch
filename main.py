@@ -1,17 +1,19 @@
-# Importing the necessary libraries
+# Importing the necessary libraries for MNIST
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as functional
 import torchvision
 import torchvision.transforms as transforms
-import tkinter
 import numpy
 import matplotlib.pyplot as plt
 import seaborn
+
+# Additional libraries which help us create a GUI for the MNIST model
+import tkinter
 from PIL import Image, ImageGrab
 
-# Checking to see if a gpu is available, but defaults to CPU if not
+# Checking to see if a GPU is available, but defaults to CPU if not
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 #Defining transformations, what we are doing here is making a preprocessing pipeline to transform the raw MNIST images into a format that is suitable for a deep learning model
