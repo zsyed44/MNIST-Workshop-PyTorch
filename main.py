@@ -58,12 +58,13 @@ class MNISTModel(nn.Module):
         self.conv3 = nn.Conv2d(32, 64, kernel_size=3, padding=1) # Since our image is now 14x14, we can use smaller filters to detect finer details and patterns (kernel represents grid size)
         self.conv4 = nn.Conv2d(64, 64, kernel_size=3, padding=1) # padding='same' keeps the output the same size as the input
 
+
         # Defining another dropout layers
         self.dropout2 = nn.Dropout(0.25) # Drops 25% of neurons
 
         # Defining fully connected layers
         self.fc1 = nn.Linear(64 * 7 * 7, 128) # A fully connected layer with 128 neurons, each in charge of learning a complex combination of patterns and previous features
-        self.dropout3 = nn.Dropout(0.5) # Another dropout layer, this time dropping 50% of neurons
+        self.dropout3 = nn.Dropout(0.4) # Another dropout layer, this time dropping 50% of neurons
         self.fc2 = nn.Linear(128, 10) # Our final layer, with 10 neurons, one for each number 0-9
 
     # Defining the forward pass of our model, this is where we define how the data flows through our model
@@ -176,3 +177,91 @@ test_accuracy = evaluate_model(model, test_loader)
 # plt.show()
 
 torch.save(model.state_dict(), 'mnist_model.pt') # Saving the model's weights to a file
+
+
+
+# ------------------- EVERYTHING BELOW THIS LINE IS NOT IN THE SCOPE OF THE MNIST WORKSHOP, IT IS A SIMPLE CODE USED TO CREATE A GUI FOR THE MNIST MODEL -------------------
+# Code is taken from Aly Ashour (President of WEAP), and slightly modified to fit the display settings of both Mac & Windows
+
+def run_gui():
+    # Load the PyTorch model
+    model = MNISTModel()
+    model.load_state_dict(torch.load('mnist_model.pt', weights_only=True))
+    model.eval()
+
+    # test the model before we run the GUI
+    device = torch.device("cpu")
+    test_dataset = torchvision.datasets.MNIST('../data', train=False, transform=transform, download=True)
+    test_loader = torch.utils.data.DataLoader(test_dataset, batch_size = 1000)
+    evaluate_model(model, test_loader)
+
+    # Run the GUI
+    root = tkinter.Tk()
+    root.title("MNIST DIGIT CLASSIFIER")
+
+    canvas = tkinter.Canvas(root, width=300, height=300, bg='white')
+    canvas.pack()
+
+    def preprocess(img):
+        # resize, grayscale, and flip black and white
+        img = img.resize((28, 28)).convert('L')
+        img_array = numpy.array(img)
+        img_array = 255 - img_array
+        img = Image.fromarray(img_array.astype(numpy.uint8))
+
+        # apply the same transformation as before
+        img_tensor = transform(img)
+        img_tensor = img_tensor.unsqueeze(0) # add a dimension for the batch
+
+        # debug
+        # img.show()
+
+        return img_tensor
+
+    def paint(event):
+        x1, y1 = (event.x - 10), (event.y - 10)
+        x2, y2 = (event.x + 10), (event.y + 10)
+        canvas.create_oval(x1, y1, x2, y2, fill='black', outline='black')
+
+    is_retina = hasattr(tkinter, "scaling") and tkinter.scaling() > 1.0
+
+    def predict_digit():
+        x0 = (root.winfo_rootx() + canvas.winfo_x())
+        y0 = (root.winfo_rooty() + canvas.winfo_y())
+        x1 = x0 + canvas.winfo_width()
+        y1 = y0 + canvas.winfo_height()
+
+        if is_retina:
+            x0, y0, x1, y1 = 2 * x0, 2 * y0, 2 * x1, 2 * y1
+
+        img = ImageGrab.grab().crop((x0, y0, x1, y1))
+        
+        # preprocess and predict
+        img_tensor = preprocess(img).to(device)
+        with torch.no_grad():
+            prediction = model(img_tensor)
+            probabilities = functional.softmax(prediction, dim=1)
+            digit = torch.argmax(probabilities, dim=1).item()
+            confidence = torch.max(probabilities).item()
+
+        # display result
+        result_label.config(text=f'Prediction: {digit}\nConfidence: {confidence:.2f}')
+
+    def clear_canvas():
+        canvas.delete('all')
+
+    canvas.bind("<B1-Motion>", paint)
+
+    btn_predict = tkinter.Button(root, text="Predict", command=predict_digit)
+    btn_predict.pack()
+
+    btn_clear = tkinter.Button(root, text="Clear", command=clear_canvas)
+    btn_clear.pack()
+
+    result_label = tkinter.Label(root, text="", font=("Helvetica", 16))
+    result_label.pack()
+
+    root.mainloop()
+
+if __name__ == '__main__':
+    run_gui()
